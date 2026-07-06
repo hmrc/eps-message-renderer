@@ -1,0 +1,6 @@
+# microservice specific routes
+
+#Deprecated, except any existing bounce event callbacks will be processed via this endpoint
+POST    /process-event/:nino      uk.gov.hmrc.epsmessagerenderer.controllers.EmailEventController.processEvent(nino: String)
+
+POST    /process-notification     uk.gov.hmrc.epsmessagerenderer.controllers.AlertController.processNotification()

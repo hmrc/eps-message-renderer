@@ -1,0 +1,65 @@
+/*
+ * Copyright 2023 HM Revenue & Customs
+ *
+ */
+
+package utils
+
+import com.github.tomakehurst.wiremock.client.WireMock.{ aResponse, post, urlEqualTo }
+import org.scalatest.concurrent.{ IntegrationPatience, ScalaFutures }
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.play.guice.GuiceOneAppPerSuite
+import play.api.i18n.Messages
+import play.api.test.Injecting
+import uk.gov.hmrc.domain.{ NinoGenerator, SaUtrGenerator }
+
+import scala.concurrent.ExecutionContext
+
+class IntegrationSpec
+    extends AnyWordSpec with GuiceOneAppPerSuite with Matchers with WireMockHelper with ScalaFutures
+    with IntegrationPatience with Injecting {
+
+  val generatedNino = NinoGenerator().nextNino
+
+  val generatedSaUtr = SaUtrGenerator().nextSaUtr
+
+  lazy val messages = inject[Messages]
+
+  implicit val ec: ExecutionContext =
+    scala.concurrent.ExecutionContext.Implicits.global
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+
+    val authResponse =
+      s"""
+         |{
+         |    "confidenceLevel": 200,
+         |    "nino": "$generatedNino",
+         |    "saUtr": "$generatedSaUtr",
+         |    "name": {
+         |        "name": "John",
+         |        "lastName": "Smith"
+         |    },
+         |    "loginTimes": {
+         |        "currentLogin": "2021-06-07T10:52:02.594Z",
+         |        "previousLogin": null
+         |    },
+         |    "optionalCredentials": {
+         |        "providerId": "4911434741952698",
+         |        "providerType": "GovernmentGateway"
+         |    },
+         |    "authProviderId": {
+         |        "ggCredId": "xyz"
+         |    },
+         |    "externalId": "testExternalId"
+         |}
+         |""".stripMargin
+
+    server.stubFor(
+      post(urlEqualTo("/auth/authorise"))
+        .willReturn(aResponse().withBody(authResponse))
+    )
+  }
+}
