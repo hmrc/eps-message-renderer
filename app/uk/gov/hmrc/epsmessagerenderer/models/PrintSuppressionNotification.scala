@@ -47,13 +47,25 @@ object ModifiedDetails {
 
 }
 
+case class AlertParameter(taxYear: String)
+
+object AlertParameter {
+  implicit val format: OFormat[AlertParameter] = Json.format[AlertParameter]
+}
+
 case class Identifier(id_type: String, value: String)
 
 object Identifier {
   implicit val identifierFormat: OFormat[Identifier] = Json.format[Identifier]
 }
 
-case class PayePrintSuppressionNotification(identifier: Identifier, hod_id: String, template_id: String)
+case class PayePrintSuppressionNotification(
+  identifier: Identifier,
+  hod_id: String,
+  template_id: String,
+  notice_type: Option[String] = None,
+  parameters: Option[AlertParameter] = None
+)
 
 object PayePrintSuppressionNotification {
   implicit val printSuppressionNotificationFormat: OFormat[PayePrintSuppressionNotification] =

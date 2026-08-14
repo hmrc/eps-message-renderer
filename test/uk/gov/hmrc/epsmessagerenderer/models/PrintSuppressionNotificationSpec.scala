@@ -65,7 +65,7 @@ class PrintSuppressionNotificationSpec extends BaseSpec {
       val auditDetails = notificationStatus.getAuditingDetails
 
       auditDetails("status") mustBe "succeeded"
-      auditDetails("availableAt") mustBe now.toString()
+      auditDetails("availableAt") mustBe now.toString
     }
 
     "return N/A in auditing details when availableAt is None" in {
@@ -106,5 +106,148 @@ class PrintSuppressionNotificationSpec extends BaseSpec {
       auditDetails("hodId") mustBe "nps"
       auditDetails("templateId") mustBe "P2"
     }
+  }
+
+  "AlertParameter.format" should {
+    import AlertParameter.format
+
+    "read the json correctly" in new TestCase {
+      Json.parse(alertParameterJsonString).as[AlertParameter] mustBe alertParameterOb
+    }
+
+    "throw exception for incorrect json" in new TestCase {
+      intercept[RuntimeException] {
+        Json.parse(invalidAlertParameterJsonString).as[AlertParameter]
+      }
+    }
+
+    "write the json correctly" in new TestCase {
+      Json.toJson(alertParameterOb) mustBe Json.parse(alertParameterJsonString)
+    }
+  }
+
+  "PayePrintSuppressionNotification.printSuppressionNotificationFormat" must {
+
+    import PayePrintSuppressionNotification.printSuppressionNotificationFormat
+
+    "read the json correctly" in new TestCase {
+      Json
+        .parse(payePrintSupNotifWithNoNoticeTypeAndAlertParameterJsonString)
+        .as[PayePrintSuppressionNotification] mustBe payePrintSupNotifWithNoNoticeTypeAndParamsOb
+
+      Json
+        .parse(payePrintSupNotifWithNoticeTypeAndAlertParameterJsonString)
+        .as[PayePrintSuppressionNotification] mustBe payePrintSupNotifWithNoticeTypeAndParamsOb
+    }
+
+    "throw exception for invalid json" in new TestCase {
+      intercept[RuntimeException] {
+        Json.parse(invalidPayePrintSupNotifJsonString).as[PayePrintSuppressionNotification]
+      }
+    }
+
+    "write the object correctly" in new TestCase {
+      Json.toJson(payePrintSupNotifWithNoNoticeTypeAndParamsOb) mustBe Json.parse(
+        payePrintSupNotifWithNoNoticeTypeAndAlertParameterJsonString
+      )
+
+      Json.toJson(payePrintSupNotifWithNoticeTypeAndParamsOb) mustBe Json.parse(
+        payePrintSupNotifWithNoticeTypeAndAlertParameterJsonString
+      )
+    }
+  }
+
+  "PrintSuppressionAlert.printSuppressionAlertFormat" must {
+
+    import PrintSuppressionAlert.printSuppressionAlertFormat
+
+    "read the json correctly" in new TestCase {
+      Json.parse(printSuppressionAlertJsonString).as[PrintSuppressionAlert] mustBe printSupAlertOb
+      Json
+        .parse(printSupAlertWithNoNoticeTypeAndParamsJsonString)
+        .as[PrintSuppressionAlert] mustBe printSupAlertWithNoNoticeTypeAndParamsOb
+    }
+
+    "throw exception for invalid json" in new TestCase {
+      intercept[RuntimeException] {
+        Json.parse(invalidPrintSupAlertJsonString).as[PrintSuppressionAlert]
+      }
+    }
+
+    "write the object correctly" in new TestCase {
+      Json.toJson(printSupAlertOb) mustBe Json.parse(printSuppressionAlertJsonString)
+      Json.toJson(printSupAlertWithNoNoticeTypeAndParamsOb) mustBe Json.parse(
+        printSupAlertWithNoNoticeTypeAndParamsJsonString
+      )
+    }
+  }
+
+  trait TestCase {
+    val alertParameterJsonString = """{"taxYear":"2026"}"""
+    val invalidAlertParameterJsonString = """{"year":"2026"}"""
+    val alertParameterOb = AlertParameter("2026")
+
+    val identifierJsonString = """{"id_type":"nino", "value":"AA000003"}"""
+    val invalidIdentifierJsonString = """{"id_type":"nino"}"""
+    val identifierOb = Identifier("nino", "AA000003")
+
+    val payePrintSupNotifWithNoNoticeTypeAndAlertParameterJsonString: String =
+      """{
+        |"identifier":{"id_type":"nino", "value":"AA000003"},
+        |"hod_id": "nps",
+        |"template_id":"4"
+        |}""".stripMargin
+
+    val payePrintSupNotifWithNoticeTypeAndAlertParameterJsonString: String =
+      """{
+        |"identifier":{"id_type":"nino", "value":"AA000003"},
+        |"hod_id": "nps",
+        |"template_id":"4",
+        |"notice_type": "CY_PLUS_1",
+        |"parameters":{"taxYear": "2026"}
+        |}""".stripMargin
+
+    val invalidPayePrintSupNotifJsonString: String =
+      """{
+        |"identifier":{"id_type":"nino", "value":"AA000003"},
+        |"template_id":"4"
+        |}""".stripMargin
+
+    val payePrintSupNotifWithNoNoticeTypeAndParamsOb =
+      PayePrintSuppressionNotification(identifier = identifierOb, hod_id = "nps", template_id = "4")
+
+    val payePrintSupNotifWithNoticeTypeAndParamsOb =
+      PayePrintSuppressionNotification(
+        identifier = identifierOb,
+        hod_id = "nps",
+        template_id = "4",
+        notice_type = Some("CY_PLUS_1"),
+        parameters = Some(alertParameterOb)
+      )
+
+    val printSuppressionAlertJsonString: String =
+      """{
+        |"alert": {
+        |"identifier":{"id_type":"nino", "value":"AA000003"},
+        |"hod_id": "nps",
+        |"template_id":"4",
+        |"notice_type": "CY_PLUS_1",
+        |"parameters":{"taxYear": "2026"}
+        |}
+        |}""".stripMargin
+
+    val printSupAlertWithNoNoticeTypeAndParamsJsonString: String =
+      """{
+        |"alert": {
+        |"identifier":{"id_type":"nino", "value":"AA000003"},
+        |"hod_id": "nps",
+        |"template_id":"4"
+        |}
+        |}""".stripMargin
+
+    val invalidPrintSupAlertJsonString = """{}"""
+
+    val printSupAlertOb = PrintSuppressionAlert(payePrintSupNotifWithNoticeTypeAndParamsOb)
+    val printSupAlertWithNoNoticeTypeAndParamsOb = PrintSuppressionAlert(payePrintSupNotifWithNoNoticeTypeAndParamsOb)
   }
 }
