@@ -61,7 +61,7 @@ class EmailConnectorSpec extends BaseSpec with WireMockHelper {
 
     "send an email alert" when {
 
-      "the http call returns an ACCEPTED (202) status" in {
+      "the http call returns an ACCEPTED (202) status and template id is default one" in {
 
         server.stubFor(
           post(sendPayeAlertUrl)
@@ -78,6 +78,36 @@ class EmailConnectorSpec extends BaseSpec with WireMockHelper {
           eventUrl = None,
           tags = Map("nino" -> nino.nino, "form-type" -> "P2")
         )
+
+        server.verify(
+          postRequestedFor(urlEqualTo(sendPayeAlertUrl))
+            .withRequestBody(equalTo(Json.toJson(emailAlert).toString))
+        )
+
+      }
+
+      "the http call returns an ACCEPTED (202) status and template id is provided" in {
+        val templateId = "daily_tax_estimate_message_alert"
+        val emailAlert = EmailAlert(
+          List(emailAddress),
+          templateId,
+          Map("fullName" -> taxpayersName),
+          eventUrl = None,
+          tags = Map("nino" -> nino.nino, "form-type" -> "P2")
+        )
+
+        server.stubFor(
+          post(sendPayeAlertUrl)
+            .withRequestBody(matchingJsonPath("$.templateId", equalTo(templateId)))
+            .withRequestBody(matchingJsonPath("$.to", equalTo("test@test.com")))
+            .withRequestBody(matchingJsonPath("$.parameters.fullName", equalTo("Joe Bloggs")))
+            .withRequestBody(matchingJsonPath("$.tags.form-type", equalTo("P2")))
+            .willReturn(aResponse.withStatus(ACCEPTED))
+        )
+
+        await(sut.sendPayeAlert(emailAddress, taxpayersName, nino, templateId))
+        verify(mockMetrics).sentEmailCount()
+
         server.verify(
           postRequestedFor(urlEqualTo(sendPayeAlertUrl))
             .withRequestBody(equalTo(Json.toJson(emailAlert).toString))

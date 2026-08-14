@@ -46,17 +46,23 @@ class EmailConnector @Inject() (
 
   private val emailServiceUrl: String = servicesConfig.baseUrl("email")
 
-  def sendPayeAlert(emailAddress: String, taxpayersName: String, nino: Nino)(implicit
+  def sendPayeAlert(
+    emailAddress: String,
+    taxpayersName: String,
+    nino: Nino,
+    templateId: String = "tax_estimate_message_alert"
+  )(implicit
     hc: HeaderCarrier
   ): Future[Unit] = {
 
     val alert = EmailAlert(
       List(emailAddress),
-      "tax_estimate_message_alert",
+      templateId,
       Map("fullName" -> taxpayersName),
       eventUrl = None,
       tags = Map("nino" -> nino.nino, "form-type" -> "P2")
     )
+
     withMetricsTimer("send-paye-alert") { timer =>
       http
         .post(url"$emailServiceUrl/hmrc/email")
@@ -83,9 +89,8 @@ class EmailConnector @Inject() (
           }
         } recover { case ex =>
         timer.completeTimerAndIncrementFailedCounter()
-        logger.error(
-          s"Problem occurred while sending paye alert for ${nino.nino} due to ${ex.getMessage}"
-        )
+        logger.error(s"Problem occurred while sending paye alert for ${nino.nino} due to ${ex.getMessage}")
+
         auditing.createAudit(
           EventTypes.Failed,
           s"Failed to send email due to ${ex.getMessage}",
