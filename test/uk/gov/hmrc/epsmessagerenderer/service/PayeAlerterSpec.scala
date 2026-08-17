@@ -16,7 +16,8 @@
 
 package uk.gov.hmrc.epsmessagerenderer.service
 
-import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers
+import org.mockito.ArgumentMatchers.{ any, anyString }
 import org.mockito.Mockito.{ reset, times, verify, when }
 import org.scalatest.concurrent.IntegrationPatience
 import play.api.http.Status.{ INTERNAL_SERVER_ERROR, LOCKED, NOT_FOUND, OK }
@@ -38,6 +39,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
   val mockPreferencesConnector: PreferencesConnector = mock[PreferencesConnector]
   val mockEmailConnector: EmailConnector = mock[EmailConnector]
   val mockMobileConnector: MobileConnector = mock[MobileConnector]
+  val testHeaderCarrier = HeaderCarrier()
 
   override protected def beforeEach(): Unit = {
     reset(mockPreferencesConnector)
@@ -89,8 +91,8 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
       auditing
     )
 
-    val payeAlert: PayeNotificationWorkItem = payeNotificationWorkItem(nino.value)
-    val payeAlertWithNoticeTypeAndParameters: PayeNotificationWorkItem = payeNotificationWorkItem(nino.value, true)
+    val payeAlert: PayeNotificationWorkItem = payeNotificationWorkItem("AT657550C")
+    val payeAlertWithNoticeTypeAndParameters: PayeNotificationWorkItem = payeNotificationWorkItem("AT657550", true)
 
     def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
       Future.successful(EmailValidation("test@gmail.com"))
@@ -101,7 +103,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
 
     when(
       mockEmailConnector
-        .sendPayeAlert(any[String], any[String], any[Nino], any[String])(any[HeaderCarrier])
+        .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
     ).thenReturn(Future.successful(()))
 
     when(
@@ -111,25 +113,31 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
   }
 
   "processNotification" must {
-
     "send paye alert" when {
 
       "an email address and person are found" in new LocalSetup {
 
         sut.processNotification(payeAlert).futureValue mustBe true
 
-        verify(mockEmailConnector).sendPayeAlert(any[String], any[String], any[Nino], any[String])(
-          any[HeaderCarrier]
-        )
+        verify(mockEmailConnector)
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
       }
 
       "work item contains notice_type and parameters in PrintSuppressionAlert," +
         " an email address and person are found for the provided nino" in new LocalSetup {
+
           sut.processNotification(payeAlertWithNoticeTypeAndParameters).futureValue mustBe true
 
-          verify(mockEmailConnector).sendPayeAlert(any[String], any[String], any[Nino], any[String])(
-            any[HeaderCarrier]
-          )
+          verify(mockEmailConnector)
+            .sendPayeAlert(
+              anyString(),
+              anyString(),
+              any[Nino](),
+              ArgumentMatchers.eq("annual_tax_estimate_message_alert"),
+              ArgumentMatchers.eq(Some("2026"))
+            )(
+              any[HeaderCarrier]
+            )
         }
     }
 
@@ -142,9 +150,10 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
 
         sut.processNotification(payeAlert).futureValue
 
-        verify(mockEmailConnector, times(0)).sendPayeAlert(any[String], any[String], any[Nino], any[String])(
-          any[HeaderCarrier]
-        )
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(
+            any[HeaderCarrier]
+          )
       }
 
       "getPerson returns any other status code" in new LocalSetup {
@@ -155,7 +164,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
         sut.processNotification(payeAlert).futureValue
 
         verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String])(any[HeaderCarrier])
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
       }
 
       "getVerifiedEmailAddress returns VerifiedEmailNotFound" in new LocalSetup {
@@ -166,7 +175,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
         sut.processNotification(payeAlert).futureValue
 
         verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String])(any[HeaderCarrier])
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
       }
 
       "getVerifiedEmailAddress returns VerifiedEmailError" in new LocalSetup {
@@ -177,7 +186,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
         sut.processNotification(payeAlert).futureValue
 
         verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String])(any[HeaderCarrier])
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
       }
 
       "getVerifiedEmailAddress returns an exception" in new LocalSetup {
@@ -187,7 +196,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
         sut.processNotification(payeAlert).futureValue
 
         verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String])(any[HeaderCarrier])
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
       }
 
       "getPerson returns NOT_FOUND (404)" in new LocalSetup {
@@ -198,7 +207,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
         sut.processNotification(payeAlert).futureValue
 
         verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String])(any[HeaderCarrier])
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
       }
 
       "getPerson returns an exception" in new LocalSetup {
@@ -209,7 +218,7 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
         sut.processNotification(payeAlert).futureValue
 
         verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String])(any[HeaderCarrier])
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
       }
     }
   }

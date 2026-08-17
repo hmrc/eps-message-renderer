@@ -50,7 +50,8 @@ class EmailConnector @Inject() (
     emailAddress: String,
     taxpayersName: String,
     nino: Nino,
-    templateId: String = "tax_estimate_message_alert"
+    templateId: String = "tax_estimate_message_alert",
+    taxYear: Option[String] = None
   )(implicit
     hc: HeaderCarrier
   ): Future[Unit] = {
@@ -58,7 +59,7 @@ class EmailConnector @Inject() (
     val alert = EmailAlert(
       List(emailAddress),
       templateId,
-      Map("fullName" -> taxpayersName),
+      emailAlertParameters(taxpayersName, taxYear),
       eventUrl = None,
       tags = Map("nino" -> nino.nino, "form-type" -> "P2")
     )
@@ -100,4 +101,11 @@ class EmailConnector @Inject() (
       }
     }
   }
+
+  private def emailAlertParameters(taxpayersName: String, taxYear: Option[String]) =
+    if (taxYear.isDefined) {
+      Map("fullName" -> taxpayersName, "taxYear" -> taxYear.get)
+    } else {
+      Map("fullName" -> taxpayersName)
+    }
 }

@@ -53,6 +53,7 @@ class PayeAlerter @Inject() (
       if nino.length > ninoLengthWithoutSuffix then Nino(nino)
       else Nino(nino + "A")
     }
+
     getPersonDetails(ninoWithTempSuffix).flatMap {
       case PersonResult(OK, Some(person)) =>
         getVerifiedEmailAddress(Nino(person.nino)).flatMap {
@@ -60,7 +61,9 @@ class PayeAlerter @Inject() (
             emailConnector.sendPayeAlert(
               emailAddress,
               SalutationHelper.salutationFrom(NpsPerson.getTaxpayersName(person)),
-              Nino(person.nino)
+              Nino(person.nino),
+              templateIdForEmailAlert(notification),
+              additionalParameterForEmailAlert(notification)
             ) flatMap { _ =>
               mobileConnector.checkAndSendNotification(Nino(person.nino))
               setStatus(Succeeded, notification.statusUrl, None)
@@ -127,6 +130,17 @@ class PayeAlerter @Inject() (
         s"Error getting emailAddress from preferences for user ${nino.nino} due to ${ex.getMessage}"
       )
       None
+    }
+
+  private def templateIdForEmailAlert(notification: PayeNotificationWorkItem): String =
+    notification.alerts.alert.notice_type.fold("tax_estimate_message_alert") {
+      case "cy" => "daily_tax_estimate_message_alert"
+      case _    => "annual_tax_estimate_message_alert"
+    }
+
+  private def additionalParameterForEmailAlert(notification: PayeNotificationWorkItem): Option[String] =
+    notification.alerts.alert.parameters.map { param =>
+      param.taxYear
     }
 
   def setStatus(status: ProcessingStatus, statusUrl: String, deferral: Option[Instant] = None)(implicit
