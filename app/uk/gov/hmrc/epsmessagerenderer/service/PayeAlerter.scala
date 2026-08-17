@@ -48,11 +48,7 @@ class PayeAlerter @Inject() (
 
   def processNotification(notification: PayeNotificationWorkItem)(implicit hc: HeaderCarrier): Future[Boolean] = {
     val nino = notification.alerts.alert.identifier.value.trim
-    val ninoWithTempSuffix = {
-      val ninoLengthWithoutSuffix = 8
-      if nino.length > ninoLengthWithoutSuffix then Nino(nino)
-      else Nino(nino + "A")
-    }
+    val ninoWithTempSuffix = ninoFromInputStringOrAppendTempSuffix(nino)
 
     getPersonDetails(ninoWithTempSuffix).flatMap {
       case PersonResult(OK, Some(person)) =>
@@ -97,6 +93,7 @@ class PayeAlerter @Inject() (
           case OK =>
             npsGetPersonResponseTimer(getPersonStartTime)
             val person = Try(response.json.as[NpsPerson]).toOption
+
             auditing.createAudit[Nino](
               EventTypes.Succeeded,
               "GET Person details succeeded",
