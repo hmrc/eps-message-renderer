@@ -51,23 +51,7 @@ class PayeAlerter @Inject() (
     val ninoWithTempSuffix = ninoFromInputStringOrAppendTempSuffix(nino)
 
     getPersonDetails(ninoWithTempSuffix).flatMap {
-      case PersonResult(OK, Some(person)) =>
-        getVerifiedEmailAddress(Nino(person.nino)).flatMap {
-          case Some(emailAddress) =>
-            emailConnector.sendPayeAlert(
-              emailAddress,
-              SalutationHelper.salutationFrom(NpsPerson.getTaxpayersName(person)),
-              Nino(person.nino),
-              templateIdForEmailAlert(notification),
-              additionalParameterForEmailAlert(notification)
-            ) flatMap { _ =>
-              mobileConnector.checkAndSendNotification(Nino(person.nino))
-              setStatus(Succeeded, notification.statusUrl, None)
-            }
-          case None =>
-            hodsAdapterConnector.optUserOutOfPrintSuppression(person.nino)
-            setStatus(PermanentlyFailed, notification.statusUrl, None)
-        }
+      case PersonResult(OK, Some(person)) => verifyEmailAndSendPayeAlert(notification, person)
 
       case PersonResult(NOT_FOUND, None) =>
         hodsAdapterConnector.optUserOutOfPrintSuppression(ninoWithTempSuffix.nino)
@@ -76,6 +60,27 @@ class PayeAlerter @Inject() (
       case _ => setStatus(Failed, notification.statusUrl, None)
     }
   }
+
+  private def verifyEmailAndSendPayeAlert(notification: PayeNotificationWorkItem, person: NpsPerson)(implicit
+    hc: HeaderCarrier
+  ) =
+    getVerifiedEmailAddress(Nino(person.nino)).flatMap {
+      case Some(emailAddress) =>
+        emailConnector.sendPayeAlert(
+          emailAddress,
+          SalutationHelper.salutationFrom(NpsPerson.getTaxpayersName(person)),
+          Nino(person.nino),
+          templateIdForEmailAlert(notification),
+          additionalParameterForEmailAlert(notification)
+        ) flatMap { _ =>
+          mobileConnector.checkAndSendNotification(Nino(person.nino))
+          setStatus(Succeeded, notification.statusUrl, None)
+        }
+
+      case None =>
+        hodsAdapterConnector.optUserOutOfPrintSuppression(person.nino)
+        setStatus(PermanentlyFailed, notification.statusUrl, None)
+    }
 
   private def npsGetPersonResponseTimer(startTime: Long): Unit = metrics.npsGetPersonResponseTimer(
     System.currentTimeMillis - startTime,
