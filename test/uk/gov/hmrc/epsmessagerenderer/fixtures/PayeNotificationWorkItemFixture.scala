@@ -49,8 +49,8 @@ object PayeNotificationWorkItemFixture {
        |    "statusUrl": "/preferences/alert/print-suppression/55c33418cb04001c05de9585/status"
        |}""".stripMargin
   )
-
-  def rawJsonAlertWithNoticeTypeAndParameters(nino: String): JsValue = Json.parse(
+//CY_PLUS_1
+  def rawJsonAlertWithNoticeTypeAndParameters(nino: String, noticeType: String): JsValue = Json.parse(
     s"""{
        |    "id":"55c33436cb04001d05de9689",
        |    "modifiedDetails": {
@@ -68,7 +68,7 @@ object PayeNotificationWorkItemFixture {
        |            },
        |            "hod_id": "nps",
        |            "template_id": "P2",
-       |            "notice_type": "CY_PLUS_1",
+       |            "notice_type": "$noticeType",
        |            "parameters":{"taxYear": "2026"}
        |        }
        |    },
@@ -76,9 +76,13 @@ object PayeNotificationWorkItemFixture {
        |}""".stripMargin
   )
 
-  def payeNotificationWorkItem(nino: String, isNoticeTypeAndParamsPresent: Boolean = false): PayeNotificationWorkItem =
+  def payeNotificationWorkItem(
+    nino: String,
+    isNoticeTypeAndParamsPresent: Boolean = false,
+    noticeType: String = "CY"
+  ): PayeNotificationWorkItem =
     if (isNoticeTypeAndParamsPresent) {
-      rawJsonAlertWithNoticeTypeAndParameters(nino).as[PayeNotificationWorkItem]
+      rawJsonAlertWithNoticeTypeAndParameters(nino, noticeType).as[PayeNotificationWorkItem]
     } else {
       rawJson(nino).as[PayeNotificationWorkItem]
     }

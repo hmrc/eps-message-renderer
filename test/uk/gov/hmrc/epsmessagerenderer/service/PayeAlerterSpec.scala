@@ -65,10 +65,27 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
           )(any[HeaderCarrier])
       }
 
-      "work item contains notice_type and parameters in PrintSuppressionAlert," +
+      "work item contains notice_type (CY) and parameters in PrintSuppressionAlert," +
         " an email address and person are found for the provided nino" in new LocalSetup {
 
-          sut.processNotification(payeAlertWithNoticeTypeAndParameters).futureValue mustBe true
+          sut.processNotification(payeAlertWithNoticeTypeAndParameters()).futureValue mustBe true
+
+          verify(mockEmailConnector)
+            .sendPayeAlert(
+              anyString(),
+              anyString(),
+              any[Nino](),
+              ArgumentMatchers.eq("daily_tax_estimate_message_alert"),
+              ArgumentMatchers.eq(Some("2026"))
+            )(
+              any[HeaderCarrier]
+            )
+        }
+
+      "work item contains notice_type (CY_PLUS_1) and parameters in PrintSuppressionAlert," +
+        " an email address and person are found for the provided nino" in new LocalSetup {
+
+          sut.processNotification(payeAlertWithNoticeTypeAndParameters("CY_PLUS_1")).futureValue mustBe true
 
           verify(mockEmailConnector)
             .sendPayeAlert(
@@ -229,7 +246,8 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
     )
 
     val payeAlert: PayeNotificationWorkItem = payeNotificationWorkItem("AT657550C")
-    val payeAlertWithNoticeTypeAndParameters: PayeNotificationWorkItem = payeNotificationWorkItem("AT657550", true)
+    def payeAlertWithNoticeTypeAndParameters(noticeType: String = "CY"): PayeNotificationWorkItem =
+      payeNotificationWorkItem("AT657550", true, noticeType)
 
     def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
       Future.successful(EmailValidation("test@gmail.com"))

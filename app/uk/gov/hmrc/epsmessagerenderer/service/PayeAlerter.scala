@@ -137,9 +137,11 @@ class PayeAlerter @Inject() (
     }
 
   private def templateIdForEmailAlert(notification: PayeNotificationWorkItem): String =
-    notification.alerts.alert.notice_type.fold("tax_estimate_message_alert") {
-      case "cy" => "daily_tax_estimate_message_alert"
-      case _    => "annual_tax_estimate_message_alert"
+    notification.alerts.alert.notice_type.fold("tax_estimate_message_alert") { noticeType =>
+      noticeType.trim.toLowerCase match {
+        case "cy" => "daily_tax_estimate_message_alert"
+        case _    => "annual_tax_estimate_message_alert"
+      }
     }
 
   private def additionalParameterForEmailAlert(notification: PayeNotificationWorkItem): Option[String] =
