@@ -72,9 +72,11 @@ class PayeAlerter @Inject() (
             hodsAdapterConnector.optUserOutOfPrintSuppression(person.nino)
             setStatus(PermanentlyFailed, notification.statusUrl, None)
         }
+
       case PersonResult(NOT_FOUND, None) =>
         hodsAdapterConnector.optUserOutOfPrintSuppression(ninoWithTempSuffix.nino)
         setStatus(PermanentlyFailed, notification.statusUrl, None)
+
       case _ => setStatus(Failed, notification.statusUrl, None)
     }
   }
@@ -139,9 +141,7 @@ class PayeAlerter @Inject() (
     }
 
   private def additionalParameterForEmailAlert(notification: PayeNotificationWorkItem): Option[String] =
-    notification.alerts.alert.parameters.map { param =>
-      param.taxYear
-    }
+    notification.alerts.alert.parameters.map(_.taxYear)
 
   def setStatus(status: ProcessingStatus, statusUrl: String, deferral: Option[Instant] = None)(implicit
     hc: HeaderCarrier

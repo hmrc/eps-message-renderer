@@ -48,8 +48,145 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
     reset(mockMetrics)
   }
 
+  "processNotification" must {
+
+    "send paye alert" when {
+      "an email address and person are found" in new LocalSetup {
+
+        sut.processNotification(payeAlert).futureValue mustBe true
+
+        verify(mockEmailConnector)
+          .sendPayeAlert(
+            any[String],
+            any[String],
+            any[Nino],
+            ArgumentMatchers.eq("tax_estimate_message_alert"),
+            any[Option[String]]
+          )(any[HeaderCarrier])
+      }
+
+      "work item contains notice_type and parameters in PrintSuppressionAlert," +
+        " an email address and person are found for the provided nino" in new LocalSetup {
+
+          sut.processNotification(payeAlertWithNoticeTypeAndParameters).futureValue mustBe true
+
+          verify(mockEmailConnector)
+            .sendPayeAlert(
+              anyString(),
+              anyString(),
+              any[Nino](),
+              ArgumentMatchers.eq("annual_tax_estimate_message_alert"),
+              ArgumentMatchers.eq(Some("2026"))
+            )(
+              any[HeaderCarrier]
+            )
+        }
+    }
+
+    "not send paye alert & successfully set the workItem status" when {
+
+      "getPerson returns LOCKED (423)" in new LocalSetup {
+
+        override def getPersonResponse: Future[HttpResponse] =
+          Future.successful(HttpResponse.apply(LOCKED, empty_string))
+
+        sut.processNotification(payeAlert).futureValue
+
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(
+            any[HeaderCarrier]
+          )
+      }
+
+      "getPerson returns any other status code" in new LocalSetup {
+
+        override def getPersonResponse: Future[HttpResponse] =
+          Future.successful(HttpResponse.apply(INTERNAL_SERVER_ERROR, empty_string))
+
+        sut.processNotification(payeAlert).futureValue
+
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+      }
+
+      "getVerifiedEmailAddress returns VerifiedEmailNotFound" in new LocalSetup {
+
+        override def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
+          Future.successful(VerifiedEmailNotFound("DE_ENROLLING"))
+
+        sut.processNotification(payeAlert).futureValue
+
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+      }
+
+      "getVerifiedEmailAddress returns VerifiedEmailError" in new LocalSetup {
+
+        override def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
+          Future.successful(VerifiedEmailError("Error reason"))
+
+        sut.processNotification(payeAlert).futureValue
+
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+      }
+
+      "getVerifiedEmailAddress returns an exception" in new LocalSetup {
+        override def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
+          Future.failed(new OtherException("Could not find email"))
+
+        sut.processNotification(payeAlert).futureValue
+
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+      }
+
+      "getPerson returns NOT_FOUND (404)" in new LocalSetup {
+
+        override def getPersonResponse: Future[HttpResponse] =
+          Future.successful(HttpResponse.apply(NOT_FOUND, empty_string))
+
+        sut.processNotification(payeAlert).futureValue
+
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+      }
+
+      "getPerson returns an exception" in new LocalSetup {
+
+        override def getPersonResponse: Future[HttpResponse] =
+          Future.failed(new Exception("Something went wrong"))
+
+        sut.processNotification(payeAlert).futureValue
+
+        verify(mockEmailConnector, times(0))
+          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+      }
+    }
+  }
+
+  "setStatus" must {
+
+    "return true" when {
+      "setWorkItemStatus returns true" in new LocalSetup {
+
+        sut.setStatus(Succeeded, "foo").futureValue mustBe true
+      }
+    }
+
+    "return false" when {
+      "setWorkItemStatus returns false" in new LocalSetup {
+        override def setWorkItemStatusResponse(): Future[Boolean] =
+          Future.successful(false)
+
+        sut.setStatus(Succeeded, "foo").futureValue mustBe false
+      }
+    }
+  }
+
   trait LocalSetup {
 
+    val empty_string = ""
     def getPersonResponse: Future[HttpResponse] = Future.successful {
       val body = Json.toJson(NpsPerson(nino.value, "Mr", "John", "Doe"))
       HttpResponse.apply(
@@ -110,137 +247,5 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
       mockMobileConnector.checkAndSendNotification(any[Nino])(any[HeaderCarrier], any[ExecutionContext])
     ).thenReturn(Future.successful(()))
 
-  }
-
-  "processNotification" must {
-    "send paye alert" when {
-
-      "an email address and person are found" in new LocalSetup {
-
-        sut.processNotification(payeAlert).futureValue mustBe true
-
-        verify(mockEmailConnector)
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-
-      "work item contains notice_type and parameters in PrintSuppressionAlert," +
-        " an email address and person are found for the provided nino" in new LocalSetup {
-
-          sut.processNotification(payeAlertWithNoticeTypeAndParameters).futureValue mustBe true
-
-          verify(mockEmailConnector)
-            .sendPayeAlert(
-              anyString(),
-              anyString(),
-              any[Nino](),
-              ArgumentMatchers.eq("annual_tax_estimate_message_alert"),
-              ArgumentMatchers.eq(Some("2026"))
-            )(
-              any[HeaderCarrier]
-            )
-        }
-    }
-
-    "not send paye alert & successfully set the workItem status" when {
-
-      "getPerson returns LOCKED (423)" in new LocalSetup {
-
-        override def getPersonResponse: Future[HttpResponse] =
-          Future.successful(HttpResponse.apply(LOCKED, ""))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(
-            any[HeaderCarrier]
-          )
-      }
-
-      "getPerson returns any other status code" in new LocalSetup {
-
-        override def getPersonResponse: Future[HttpResponse] =
-          Future.successful(HttpResponse.apply(INTERNAL_SERVER_ERROR, ""))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-
-      "getVerifiedEmailAddress returns VerifiedEmailNotFound" in new LocalSetup {
-
-        override def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
-          Future.successful(VerifiedEmailNotFound("DE_ENROLLING"))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-
-      "getVerifiedEmailAddress returns VerifiedEmailError" in new LocalSetup {
-
-        override def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
-          Future.successful(VerifiedEmailError("Error reason"))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-
-      "getVerifiedEmailAddress returns an exception" in new LocalSetup {
-        override def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
-          Future.failed(new OtherException("Could not find email"))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-
-      "getPerson returns NOT_FOUND (404)" in new LocalSetup {
-
-        override def getPersonResponse: Future[HttpResponse] =
-          Future.successful(HttpResponse.apply(NOT_FOUND, ""))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-
-      "getPerson returns an exception" in new LocalSetup {
-
-        override def getPersonResponse: Future[HttpResponse] =
-          Future.failed(new Exception("Something went wrong"))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-    }
-  }
-
-  "setStatus" must {
-
-    "return true" when {
-
-      "setWorkItemStatus returns true" in new LocalSetup {
-
-        sut.setStatus(Succeeded, "foo").futureValue mustBe true
-      }
-    }
-
-    "return false" when {
-
-      "setWorkItemStatus returns false" in new LocalSetup {
-        override def setWorkItemStatusResponse(): Future[Boolean] =
-          Future.successful(false)
-
-        sut.setStatus(Succeeded, "foo").futureValue mustBe false
-      }
-    }
   }
 }
