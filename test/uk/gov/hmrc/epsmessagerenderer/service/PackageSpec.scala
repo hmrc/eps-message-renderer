@@ -18,6 +18,7 @@ package uk.gov.hmrc.epsmessagerenderer.service
 
 import uk.gov.hmrc.epsmessagerenderer.BaseSpec
 import uk.gov.hmrc.domain.Nino
+import uk.gov.hmrc.epsmessagerenderer.models.{ AlertParameter, Identifier, PayePrintSuppressionNotification }
 
 class PackageSpec extends BaseSpec {
 
@@ -53,6 +54,35 @@ class PackageSpec extends BaseSpec {
 
         result mustBe a[Nino]
         result.nino mustBe inputNinoString
+      }
+    }
+  }
+
+  "templateIdForEmailAlert" should {
+
+    "return correct template_id" when {
+      val payePrintSupNotif = PayePrintSuppressionNotification(
+        identifier = Identifier("test_id", "test_value"),
+        hod_id = "test_id",
+        template_id = "test_id",
+        notice_type = None,
+        parameters = None
+      )
+
+      "notice_type is unavailable" in {
+        templateIdForEmailAlert(payePrintSupNotif) mustBe TAX_ESTIMATE_MESSAGE_ALERT_ID
+      }
+
+      "notice_type is CY" in {
+        templateIdForEmailAlert(
+          payePrintSupNotif.copy(notice_type = Some("CY"))
+        ) mustBe DAILY_TAX_ESTIMATE_MESSAGE_ALERT_ID
+      }
+
+      "notice_type is CY_PLUS_1" in {
+        templateIdForEmailAlert(
+          payePrintSupNotif.copy(notice_type = Some("CY_PLUS_1"))
+        ) mustBe ANNUAL_TAX_ESTIMATE_MESSAGE_ALERT_ID
       }
     }
   }

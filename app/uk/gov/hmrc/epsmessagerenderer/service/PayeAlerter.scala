@@ -70,7 +70,7 @@ class PayeAlerter @Inject() (
           emailAddress,
           SalutationHelper.salutationFrom(NpsPerson.getTaxpayersName(person)),
           Nino(person.nino),
-          templateIdForEmailAlert(notification),
+          templateIdForEmailAlert(notification.alerts.alert),
           additionalParameterForEmailAlert(notification)
         ) flatMap { _ =>
           mobileConnector.checkAndSendNotification(Nino(person.nino))
@@ -134,14 +134,6 @@ class PayeAlerter @Inject() (
         s"Error getting emailAddress from preferences for user ${nino.nino} due to ${ex.getMessage}"
       )
       None
-    }
-
-  private def templateIdForEmailAlert(notification: PayeNotificationWorkItem): String =
-    notification.alerts.alert.notice_type.fold("tax_estimate_message_alert") { noticeType =>
-      noticeType.trim.toLowerCase match {
-        case "cy" => "daily_tax_estimate_message_alert"
-        case _    => "annual_tax_estimate_message_alert"
-      }
     }
 
   private def additionalParameterForEmailAlert(notification: PayeNotificationWorkItem): Option[String] =

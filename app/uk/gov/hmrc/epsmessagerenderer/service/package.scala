@@ -17,8 +17,13 @@
 package uk.gov.hmrc.epsmessagerenderer
 
 import uk.gov.hmrc.domain.Nino
+import uk.gov.hmrc.epsmessagerenderer.models.PayePrintSuppressionNotification
 
 package object service {
+
+  private val TAX_ESTIMATE_MESSAGE_ALERT_ID = "tax_estimate_message_alert"
+  private val DAILY_TAX_ESTIMATE_MESSAGE_ALERT_ID = "daily_tax_estimate_message_alert"
+  private val ANNUAL_TAX_ESTIMATE_MESSAGE_ALERT_ID = "annual_tax_estimate_message_alert"
 
   def ninoFromInputStringOrAppendTempSuffix(originalNino: String): Nino = {
     val ninoLengthWithoutSuffix = 8
@@ -27,4 +32,12 @@ package object service {
     if originalNinoAfterTrim.length > ninoLengthWithoutSuffix then Nino(originalNinoAfterTrim)
     else Nino(originalNinoAfterTrim + "A")
   }
+
+  def templateIdForEmailAlert(payePrintSupNotif: PayePrintSuppressionNotification): String =
+    payePrintSupNotif.notice_type.fold(TAX_ESTIMATE_MESSAGE_ALERT_ID) { noticeType =>
+      noticeType.trim.toLowerCase match {
+        case "cy" => DAILY_TAX_ESTIMATE_MESSAGE_ALERT_ID
+        case _    => ANNUAL_TAX_ESTIMATE_MESSAGE_ALERT_ID
+      }
+    }
 }
