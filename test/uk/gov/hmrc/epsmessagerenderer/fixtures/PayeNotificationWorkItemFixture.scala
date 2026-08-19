@@ -49,7 +49,7 @@ object PayeNotificationWorkItemFixture {
        |    "statusUrl": "/preferences/alert/print-suppression/55c33418cb04001c05de9585/status"
        |}""".stripMargin
   )
-//CY_PLUS_1
+
   def rawJsonAlertWithNoticeTypeAndParameters(nino: String, noticeType: String): JsValue = Json.parse(
     s"""{
        |    "id":"55c33436cb04001d05de9689",
@@ -86,5 +86,4 @@ object PayeNotificationWorkItemFixture {
     } else {
       rawJson(nino).as[PayeNotificationWorkItem]
     }
-
 }
