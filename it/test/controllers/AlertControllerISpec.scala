@@ -53,7 +53,7 @@ class AlertControllerISpec extends IntegrationSpec {
              |"hod_id":"nps",
              |"template_id":"0004",
              |"parameters": {"taxYear": "2027"},
-             |"notice_type": "CY"}
+             |"notice_type": "CY_PLUS_1"}
              |},
              |"statusUrl":"/eps-hods-adapter/preferences/alert/print-suppression/123456/status"
              |}""".stripMargin
@@ -62,7 +62,7 @@ class AlertControllerISpec extends IntegrationSpec {
 
       val emailAlert = EmailAlert(
         List("test@digital.gov.uk"),
-        "daily_tax_estimate_message_alert",
+        "annual_tax_estimate_message_alert",
         Map("fullName" -> "Mr John Smith", "taxYear" -> "2027"),
         eventUrl = None,
         tags = Map("nino" -> s"${generatedNino.nino}", "form-type" -> "P2")
@@ -125,7 +125,7 @@ class AlertControllerISpec extends IntegrationSpec {
              |"hod_id":"nps",
              |"template_id":"0004",
              |"parameters": {"taxYear": "2027"},
-             |"notice_type": "CY"}
+             |"notice_type": "CY_PLUS_1"}
              |},
              |"statusUrl":"/eps-hods-adapter/preferences/alert/print-suppression/123456/status"
              |}""".stripMargin
