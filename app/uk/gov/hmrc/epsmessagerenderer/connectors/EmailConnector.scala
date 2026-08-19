@@ -55,7 +55,6 @@ class EmailConnector @Inject() (
   )(implicit
     hc: HeaderCarrier
   ): Future[Unit] = {
-
     val alert = EmailAlert(
       List(emailAddress),
       templateId,
