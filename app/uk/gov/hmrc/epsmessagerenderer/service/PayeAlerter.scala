@@ -48,33 +48,39 @@ class PayeAlerter @Inject() (
 
   def processNotification(notification: PayeNotificationWorkItem)(implicit hc: HeaderCarrier): Future[Boolean] = {
     val nino = notification.alerts.alert.identifier.value.trim
-    val ninoWithTempSuffix = {
-      val ninoLengthWithoutSuffix = 8
-      if nino.length > ninoLengthWithoutSuffix then Nino(nino)
-      else Nino(nino + "A")
-    }
+    val ninoWithTempSuffix = ninoFromInputStringOrAppendTempSuffix(nino)
+
     getPersonDetails(ninoWithTempSuffix).flatMap {
-      case PersonResult(OK, Some(person)) =>
-        getVerifiedEmailAddress(Nino(person.nino)).flatMap {
-          case Some(emailAddress) =>
-            emailConnector.sendPayeAlert(
-              emailAddress,
-              SalutationHelper.salutationFrom(NpsPerson.getTaxpayersName(person)),
-              Nino(person.nino)
-            ) flatMap { _ =>
-              mobileConnector.checkAndSendNotification(Nino(person.nino))
-              setStatus(Succeeded, notification.statusUrl, None)
-            }
-          case None =>
-            hodsAdapterConnector.optUserOutOfPrintSuppression(person.nino)
-            setStatus(PermanentlyFailed, notification.statusUrl, None)
-        }
+      case PersonResult(OK, Some(person)) => verifyEmailAndSendPayeAlert(notification, person)
+
       case PersonResult(NOT_FOUND, None) =>
         hodsAdapterConnector.optUserOutOfPrintSuppression(ninoWithTempSuffix.nino)
         setStatus(PermanentlyFailed, notification.statusUrl, None)
+
       case _ => setStatus(Failed, notification.statusUrl, None)
     }
   }
+
+  private def verifyEmailAndSendPayeAlert(notification: PayeNotificationWorkItem, person: NpsPerson)(implicit
+    hc: HeaderCarrier
+  ) =
+    getVerifiedEmailAddress(Nino(person.nino)).flatMap {
+      case Some(emailAddress) =>
+        emailConnector.sendPayeAlert(
+          emailAddress,
+          SalutationHelper.salutationFrom(NpsPerson.getTaxpayersName(person)),
+          Nino(person.nino),
+          templateIdForEmailAlert(notification.alerts.alert),
+          additionalParameterForEmailAlert(notification)
+        ) flatMap { _ =>
+          mobileConnector.checkAndSendNotification(Nino(person.nino))
+          setStatus(Succeeded, notification.statusUrl, None)
+        }
+
+      case None =>
+        hodsAdapterConnector.optUserOutOfPrintSuppression(person.nino)
+        setStatus(PermanentlyFailed, notification.statusUrl, None)
+    }
 
   private def npsGetPersonResponseTimer(startTime: Long): Unit = metrics.npsGetPersonResponseTimer(
     System.currentTimeMillis - startTime,
@@ -92,6 +98,7 @@ class PayeAlerter @Inject() (
           case OK =>
             npsGetPersonResponseTimer(getPersonStartTime)
             val person = Try(response.json.as[NpsPerson]).toOption
+
             auditing.createAudit[Nino](
               EventTypes.Succeeded,
               "GET Person details succeeded",
@@ -128,6 +135,9 @@ class PayeAlerter @Inject() (
       )
       None
     }
+
+  private def additionalParameterForEmailAlert(notification: PayeNotificationWorkItem): Option[String] =
+    notification.alerts.alert.parameters.map(_.taxYear)
 
   def setStatus(status: ProcessingStatus, statusUrl: String, deferral: Option[Instant] = None)(implicit
     hc: HeaderCarrier

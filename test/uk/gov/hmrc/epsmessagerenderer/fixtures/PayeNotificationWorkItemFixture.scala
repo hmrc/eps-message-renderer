@@ -24,7 +24,7 @@ import java.time.Instant
 
 object PayeNotificationWorkItemFixture {
 
-  val dateTime = DateFormats.instantFormats.writes(Instant.now()).toString()
+  val dateTime: String = DateFormats.instantFormats.writes(Instant.now()).toString()
 
   def rawJson(nino: String): JsValue = Json.parse(
     s"""{
@@ -50,7 +50,40 @@ object PayeNotificationWorkItemFixture {
        |}""".stripMargin
   )
 
-  def payeNotificationWorkItem(nino: String): PayeNotificationWorkItem =
-    rawJson(nino).as[PayeNotificationWorkItem]
+  def rawJsonAlertWithNoticeTypeAndParameters(nino: String, noticeType: String): JsValue = Json.parse(
+    s"""{
+       |    "id":"55c33436cb04001d05de9689",
+       |    "modifiedDetails": {
+       |        "createdAt": $dateTime,
+       |        "lastUpdated": $dateTime
+       |    },
+       |    "availableAt": $dateTime,
+       |    "status": "todo",
+       |    "failures": 0,
+       |    "alerts": {
+       |        "alert" : {
+       |            "identifier": {
+       |                "id_type": "nino",
+       |                "value": "$nino"
+       |            },
+       |            "hod_id": "nps",
+       |            "template_id": "P2",
+       |            "notice_type": "$noticeType",
+       |            "parameters":{"taxYear": "2026"}
+       |        }
+       |    },
+       |    "statusUrl": "/preferences/alert/print-suppression/55c33418cb04001c05de9585/status"
+       |}""".stripMargin
+  )
 
+  def payeNotificationWorkItem(
+    nino: String,
+    isNoticeTypeAndParamsPresent: Boolean = false,
+    noticeType: String = "CY"
+  ): PayeNotificationWorkItem =
+    if (isNoticeTypeAndParamsPresent) {
+      rawJsonAlertWithNoticeTypeAndParameters(nino, noticeType).as[PayeNotificationWorkItem]
+    } else {
+      rawJson(nino).as[PayeNotificationWorkItem]
+    }
 }

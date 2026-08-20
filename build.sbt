@@ -54,7 +54,8 @@ lazy val it = (project in file("it"))
   .dependsOn(microservice % "test->test")
   .settings(DefaultBuildSettings.itSettings())
   .settings(
-    libraryDependencies ++= AppDependencies.it
+    libraryDependencies ++= AppDependencies.it,
+    scalacOptions ++= List("-Wconf:msg=Flag.*repeatedly:s")
   )
 
 Test / test := (Test / test)

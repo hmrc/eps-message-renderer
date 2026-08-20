@@ -23,7 +23,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import play.api.i18n.Messages
 import play.api.test.Injecting
-import uk.gov.hmrc.domain.{ NinoGenerator, SaUtrGenerator }
+import uk.gov.hmrc.domain.{ Nino, NinoGenerator, SaUtr, SaUtrGenerator }
 
 import scala.concurrent.ExecutionContext
 
@@ -31,11 +31,11 @@ class IntegrationSpec
     extends AnyWordSpec with GuiceOneAppPerSuite with Matchers with WireMockHelper with ScalaFutures
     with IntegrationPatience with Injecting {
 
-  val generatedNino = NinoGenerator().nextNino
+  val generatedNino: Nino = NinoGenerator().nextNino
 
-  val generatedSaUtr = SaUtrGenerator().nextSaUtr
+  val generatedSaUtr: SaUtr = SaUtrGenerator().nextSaUtr
 
-  lazy val messages = inject[Messages]
+  lazy val messages: Messages = inject[Messages]
 
   implicit val ec: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global

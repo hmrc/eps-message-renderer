@@ -17,17 +17,18 @@
 package controllers
 
 import com.github.tomakehurst.wiremock.client.WireMock.{ aResponse, post, urlEqualTo }
+import play.api.Application
 import play.api.http.Status.NO_CONTENT
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.Json
-import play.api.test.Helpers._
+import play.api.test.Helpers.*
 import play.api.test.{ FakeHeaders, FakeRequest }
 import uk.gov.hmrc.epsmessagerenderer.models.nps.NpsPrintSuppressionUpdateRequest
 import utils.IntegrationSpec
 
 class EmailEventControllerISpec extends IntegrationSpec {
 
-  override def fakeApplication() =
+  override def fakeApplication(): Application =
     GuiceApplicationBuilder()
       .configure(
         "microservice.services.auth.port"            -> server.port(),
