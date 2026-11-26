@@ -24,7 +24,7 @@ import play.api.http.Status.{ INTERNAL_SERVER_ERROR, NOT_FOUND, OK }
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.Json
 import uk.gov.hmrc.epsmessagerenderer.BaseSpec
-import uk.gov.hmrc.epsmessagerenderer.models.{ EmailValidation, VerifiedEmailNotFound }
+import uk.gov.hmrc.epsmessagerenderer.models.{ EmailValidation, VerifiedEmailError, VerifiedEmailNotFound }
 
 class PreferencesConnectorSpec extends BaseSpec with WireMockHelper with IntegrationPatience {
 
@@ -81,7 +81,7 @@ class PreferencesConnectorSpec extends BaseSpec with WireMockHelper with Integra
         }
       }
 
-      "thrown an exception" when {
+      "return VerifiedEmailError object" when {
         "status code is anything else" in {
 
           server.stubFor(
@@ -91,10 +91,9 @@ class PreferencesConnectorSpec extends BaseSpec with WireMockHelper with Integra
               )
           )
 
-          the[Exception] thrownBy {
-            sut.getVerifiedEmailAddress(nino).futureValue
-          } must have message
-            s"The future returned an exception of type: java.lang.Exception, with message: OTHER_EXCEPTION_$INTERNAL_SERVER_ERROR."
+          sut
+            .getVerifiedEmailAddress(nino)
+            .futureValue mustBe VerifiedEmailError("Call returned 500")
         }
 
         "when the call to the connector fails" in {
@@ -106,9 +105,9 @@ class PreferencesConnectorSpec extends BaseSpec with WireMockHelper with Integra
               )
           )
 
-          val executed = sut.getVerifiedEmailAddress(nino)
-
-          an[Exception] must be thrownBy executed.futureValue
+          sut
+            .getVerifiedEmailAddress(nino)
+            .futureValue mustBe VerifiedEmailError("Call threw exception: Remotely closed")
         }
       }
     }
