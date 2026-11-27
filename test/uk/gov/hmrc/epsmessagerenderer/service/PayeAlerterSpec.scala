@@ -17,7 +17,7 @@
 package uk.gov.hmrc.epsmessagerenderer.service
 
 import org.mockito.ArgumentMatchers
-import org.mockito.ArgumentMatchers.{ any, anyString }
+import org.mockito.ArgumentMatchers.{ any, anyString, eq as meq }
 import org.mockito.Mockito.{ reset, times, verify, when }
 import org.scalatest.concurrent.IntegrationPatience
 import play.api.http.Status.{ INTERNAL_SERVER_ERROR, LOCKED, NOT_FOUND, OK }
@@ -28,7 +28,7 @@ import uk.gov.hmrc.epsmessagerenderer.connectors.*
 import uk.gov.hmrc.epsmessagerenderer.fixtures.PayeNotificationWorkItemFixture.payeNotificationWorkItem
 import uk.gov.hmrc.epsmessagerenderer.models.*
 import uk.gov.hmrc.epsmessagerenderer.models.nps.NpsPerson
-import uk.gov.hmrc.epsmessagerenderer.models.workitem.ProcessingStatus.Succeeded
+import uk.gov.hmrc.epsmessagerenderer.models.workitem.ProcessingStatus.{ Failed, PermanentlyFailed, Succeeded }
 import uk.gov.hmrc.epsmessagerenderer.util.LogCapturing
 import uk.gov.hmrc.http.{ HeaderCarrier, HttpResponse }
 
@@ -39,10 +39,12 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
   val mockPreferencesConnector: PreferencesConnector = mock[PreferencesConnector]
   val mockEmailConnector: EmailConnector = mock[EmailConnector]
   val mockMobileConnector: MobileConnector = mock[MobileConnector]
+  val mockHodsAdapterConnector: HodsAdapterConnector = mock[HodsAdapterConnector]
   val testHeaderCarrier = HeaderCarrier()
 
   override protected def beforeEach(): Unit = {
     reset(mockPreferencesConnector)
+    reset(mockHodsAdapterConnector)
     reset(mockEmailConnector)
     reset(mockMobileConnector)
     reset(mockMetrics)
@@ -135,6 +137,13 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
 
         verify(mockEmailConnector, times(0))
           .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+        verify(mockHodsAdapterConnector, times(1))
+          .optUserOutOfPrintSuppression(any[String])(any[HeaderCarrier], any[ExecutionContext])
+        verify(mockHodsAdapterConnector, times(1))
+          .setWorkItemStatus(any[String], meq(NotificationStatus(PermanentlyFailed, None)))(
+            any[HeaderCarrier],
+            any[ExecutionContext]
+          )
       }
 
       "getVerifiedEmailAddress returns VerifiedEmailError" in new LocalSetup {
@@ -146,16 +155,11 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
 
         verify(mockEmailConnector, times(0))
           .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
-      }
-
-      "getVerifiedEmailAddress returns an exception" in new LocalSetup {
-        override def getVerifiedEmailAddressResponse: Future[VerifiedEmailAddressResponse] =
-          Future.failed(new OtherException("Could not find email"))
-
-        sut.processNotification(payeAlert).futureValue
-
-        verify(mockEmailConnector, times(0))
-          .sendPayeAlert(any[String], any[String], any[Nino], any[String], any[Option[String]])(any[HeaderCarrier])
+        verify(mockHodsAdapterConnector, times(1))
+          .setWorkItemStatus(any[String], meq(NotificationStatus(Failed, None)))(
+            any[HeaderCarrier],
+            any[ExecutionContext]
+          )
       }
 
       "getPerson returns NOT_FOUND (404)" in new LocalSetup {
@@ -215,29 +219,8 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
 
     def setWorkItemStatusResponse(): Future[Boolean] = Future.successful(true)
 
-    object StubHodsAdapterConnector
-        extends HodsAdapterConnector(
-          kenshooMetrics,
-          http,
-          servicesConfig,
-          auditing
-        ) {
-      override def optUserOutOfPrintSuppression(
-        nino: Metric
-      )(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[Boolean] = Future.successful(true)
-
-      override def getPerson(nino: Nino)(implicit hc: HeaderCarrier, ec: ExecutionContext): Future[HttpResponse] =
-        getPersonResponse
-
-      override def setWorkItemStatus(path: String, processingStatus: NotificationStatus)(implicit
-        hc: HeaderCarrier,
-        ec: ExecutionContext
-      ): Future[Boolean] =
-        setWorkItemStatusResponse()
-    }
-
     def sut: PayeAlerter = new PayeAlerter(
-      StubHodsAdapterConnector,
+      mockHodsAdapterConnector,
       mockPreferencesConnector,
       mockEmailConnector,
       mockMobileConnector,
@@ -265,5 +248,14 @@ class PayeAlerterSpec extends BaseSpec with IntegrationPatience with LogCapturin
       mockMobileConnector.checkAndSendNotification(any[Nino])(any[HeaderCarrier], any[ExecutionContext])
     ).thenReturn(Future.successful(()))
 
+    when(mockHodsAdapterConnector.getPerson(any[Nino])(any[HeaderCarrier], any[ExecutionContext]))
+      .thenReturn(getPersonResponse)
+    when(mockHodsAdapterConnector.optUserOutOfPrintSuppression(any[String])(any[HeaderCarrier], any[ExecutionContext]))
+      .thenReturn(Future.successful(true))
+    when(
+      mockHodsAdapterConnector
+        .setWorkItemStatus(any[String], any[NotificationStatus])(any[HeaderCarrier], any[ExecutionContext])
+    )
+      .thenReturn(setWorkItemStatusResponse())
   }
 }

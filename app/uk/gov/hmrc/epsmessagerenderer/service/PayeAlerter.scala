@@ -64,8 +64,8 @@ class PayeAlerter @Inject() (
   private def verifyEmailAndSendPayeAlert(notification: PayeNotificationWorkItem, person: NpsPerson)(implicit
     hc: HeaderCarrier
   ) =
-    getVerifiedEmailAddress(Nino(person.nino)).flatMap {
-      case Some(emailAddress) =>
+    preferencesConnector.getVerifiedEmailAddress(Nino(person.nino)).flatMap {
+      case EmailValidation(emailAddress) =>
         emailConnector.sendPayeAlert(
           emailAddress,
           SalutationHelper.salutationFrom(NpsPerson.getTaxpayersName(person)),
@@ -74,12 +74,15 @@ class PayeAlerter @Inject() (
           additionalParameterForEmailAlert(notification)
         ) flatMap { _ =>
           mobileConnector.checkAndSendNotification(Nino(person.nino))
-          setStatus(Succeeded, notification.statusUrl, None)
+          setStatus(Succeeded, notification.statusUrl)
         }
 
-      case None =>
+      case VerifiedEmailNotFound(_) =>
         hodsAdapterConnector.optUserOutOfPrintSuppression(person.nino)
-        setStatus(PermanentlyFailed, notification.statusUrl, None)
+        setStatus(PermanentlyFailed, notification.statusUrl)
+
+      case VerifiedEmailError(_) =>
+        setStatus(Failed, notification.statusUrl)
     }
 
   private def npsGetPersonResponseTimer(startTime: Long): Unit = metrics.npsGetPersonResponseTimer(
@@ -118,23 +121,6 @@ class PayeAlerter @Inject() (
       PersonResult(INTERNAL_SERVER_ERROR, None)
     }
   }
-
-  // ToDo Remove this wrapper function & use connector function with returning emailAddress
-  private def getVerifiedEmailAddress(nino: Nino)(implicit
-    hc: HeaderCarrier
-  ): Future[Option[String]] =
-    preferencesConnector
-      .getVerifiedEmailAddress(nino)
-      .map {
-        case EmailValidation(emailAddress) => Option(emailAddress)
-        case _                             => None
-      } recover { case ex =>
-      auditing.createAudit[Nino](EventTypes.Failed, s"Verified Email call returned an exception ${ex.getMessage}", nino)
-      logger.warn(
-        s"Error getting emailAddress from preferences for user ${nino.nino} due to ${ex.getMessage}"
-      )
-      None
-    }
 
   private def additionalParameterForEmailAlert(notification: PayeNotificationWorkItem): Option[String] =
     notification.alerts.alert.parameters.map(_.taxYear)

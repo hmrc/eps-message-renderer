@@ -83,20 +83,17 @@ class PreferencesConnector @Inject() (
                 s"Unable to verify email address for $identifier | $reason",
                 VerifiedEmailError(reason)
               )
-              throw new OtherException(s"OTHER_EXCEPTION_$status")
+              VerifiedEmailError(reason)
           }
         } recover { case e: Exception =>
-        val reason = s"Call threw exception: ${e.getClass}"
-        logger.warn(
-          "[getVerifiedEmailAddress] , Problem occurred while getting verified email address for NINO " + s"$identifier | $reason"
-        )
+        val reason = s"Call threw exception: ${e.getMessage}"
         timer.completeTimerAndIncrementFailedCounter()
         auditing.createAudit[VerifiedEmailError](
           EventTypes.Failed,
           s"Unable to verify email address for $identifier | $reason",
           VerifiedEmailError(reason)
         )
-        throw new Exception(e.getMessage, e)
+        VerifiedEmailError(reason)
       }
     }
   }
